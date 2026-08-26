@@ -28,10 +28,12 @@ dependencies. There is nothing else to set up. No virtual environment, no
 `pip install`.
 
 ```bash
-uv run fetch.py && uv run parse.py
+uv run fetch.py && uv run parse.py && uv run classify.py && uv run docs_match.py
 ```
 
-That is stages 1 and 2. Later stages get added as they are built.
+Stage 3 needs an Anthropic API key. Put it in a `.env` file as
+`ANTHROPIC_API_KEY=...` or export it in your shell. Classifying all 1,559 reviews
+costs a few dollars of API credit, paid once and then cached.
 
 ## The five stages
 
@@ -39,8 +41,9 @@ That is stages 1 and 2. Later stages get added as they are built.
 |---|---|---|---|
 | 1 | `fetch.py` | Downloads every review page and saves the raw HTML | Done |
 | 2 | `parse.py` | Pulls the reviews out of the HTML into a SQLite database | Done |
-| 3 | `classify.py` | Has Claude categorise each review, then hand-checks its work | Not started |
-| 4 | `docs_match.py` | Checks each complaint against Aftersell's own help docs | Not started |
+| 3 | `classify.py` | Has Claude categorise each review | Done |
+| 3b | `audit.py` | Checks a sample of those answers by hand | Built, not yet run |
+| 4 | `docs_match.py` | Checks each complaint against Aftersell's own help docs | Done |
 | 5 | `report.py` | Builds the triage sheet as a single HTML page | Not started |
 
 Each stage is a separate script on purpose. Pulling structured data out of a web page
@@ -105,6 +108,46 @@ hour of installing.
 site markup changes and the parser starts reading the wrong element, the build stops
 rather than quietly producing a database that looks fine.
 
+## Stage 3: what the reviews are about
+
+133 reviews contain a complaint. Who could resolve them:
+
+| | Count |
+|---|---|
+| Support could fix it | 52 |
+| Support can only explain it | 47 |
+| Needs engineering | 34 |
+
+The most common complaints are a genuinely missing feature (32), a billing surprise
+(21), the app crashing or freezing (18), and a theme conflict (15). A further 44
+reviews complain about support quality alongside whatever else brought them there.
+
+Only 77 of those 133 complaints come from reviews rated 3 stars or below. The other
+56 are in 4 and 5 star reviews, 38 of them in 5-star reviews from merchants who are
+happy overall and still describe a problem. Classifying only the negatives, which
+was the original plan, would have missed four in ten of the complaints in this
+dataset.
+
+Praise is overwhelmingly about people rather than software. Support quality is the
+reason given in 971 reviews, against 136 for revenue results.
+
+## Stage 4: does the documentation already cover it?
+
+The question is not whether the docs mention a problem. It is whether the merchant
+who wrote the review would have found the page. A detailed article explaining why
+Apple Pay cannot trigger post-purchase upsells helps nobody if it is titled in words
+no angry merchant would search for.
+
+| | Complaint types | Reviews affected |
+|---|---|---|
+| Documented but buried | 4 | 58 |
+| Documented and easy to find | 6 | 55 |
+| Not documented | 2 | 20 |
+
+Two things have no page at all. There is nothing explaining how to contact support,
+what response times to expect, or how to escalate. And nothing covers products
+appearing on customer orders without consent, which six reviews describe.
+
 ## Working with AI on this project
 
 Claude is used two different ways here, and the distinction matters.
@@ -115,18 +158,23 @@ The stage 2 entry is the one worth reading: a bug filled the country column with
 names in all 1,765 rows, and the printed summary looked entirely correct anyway. It
 turned up only because I wrote a check for it.
 
-It also classifies the reviews in stage 3, and that is the part where taking the
-output on trust would be a real mistake. So stage 3 includes a hand-audit: I label a
-random sample of reviews myself, without looking at what the model said, then compare
-the two. The agreement rate and every disagreement go into `NOTES.md` and into the
-final report. Without that step there would be no way to tell you how often the
-labels are wrong.
+It also classified all 1,559 reviews in stage 3, and that is the part where taking
+the output on trust would be a real mistake. So `audit.py` shows me a sample spread
+across every complaint type, one review at a time, without the model's answer,
+records what I think, and then reports the agreement rate and every disagreement.
+
+That audit has not been run yet, which means every stage 3 number above is currently
+the model's opinion, unchecked. Saying so is the point. The agreement rate goes into
+`NOTES.md` and the final report once it exists.
 
 ## Files
 
 ```
 fetch.py      stage 1, the downloader
 parse.py      stage 2, HTML into SQLite, with built-in data checks
+classify.py   stage 3, asks Claude to categorise every review
+audit.py      stage 3b, checks a sample of those answers by hand
+docs_match.py stage 4, complaint types against the published doc index
 NOTES.md      decision log: every judgement call and why
 data/         scraped pages and the database, not committed, regenerate with the scripts
 ```

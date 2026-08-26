@@ -250,3 +250,201 @@ really were.
 The tenure figure is what the page displays, which I have assumed is the merchant's
 tenure at the time they wrote the review. Shopify does not document this, so it is an
 assumption rather than a verified fact.
+
+---
+
+## Stage 3: classifying every review
+
+Date: 26 August 2026
+
+### What this stage does
+
+Sends all 1,559 reviews that have text to Claude and asks it to categorise each
+one: what the complaint is, whether support could resolve it, what the praise is
+about, and which staff are named. The 206 reviews with a star rating and no text
+are skipped, because there is nothing in them to classify.
+
+Answers are cached by review id, so re-running costs nothing, and rows are written
+as they arrive rather than at the end. Interrupting the run loses nothing.
+
+Every answer is stored with the model's raw response next to it. Any number in the
+final report can be traced back to exactly what the model said about a specific
+review.
+
+### The categories were built from the data, not assumed
+
+The project started with seven categories written from reading a sample by hand.
+Before writing the classifier I read all 77 negative reviews that have text. Three
+things needed to change.
+
+**Support quality came out of the category list and became its own yes/no field.**
+This is the most important change. Complaints about slow or unhelpful support
+appear alongside a different underlying problem in most negative reviews. If
+support quality has to compete for a single category slot, one of the two signals
+is destroyed: either the technical problem is hidden behind the support complaint,
+or the support pattern disappears. As a separate flag both survive. 44 reviews
+carry it.
+
+**"Offer doesn't fire" split into two.** `offer_not_firing` for a funnel that does
+not trigger, and `app_unreliable` for crashes, freezes, blank screens and lost
+work. A support agent handles those differently: one is configuration, the other is
+an escalation.
+
+**Five categories the data had that the original list did not.**
+`third_party_integration_broken` covers UpCart stopping Klaviyo from seeing
+add-to-cart events, analytics double counting, and ad platform attribution
+breaking. `unexpected_order_change` covers products appearing on customer orders
+without consent and duplicate charges, which is the most serious class in the set.
+`cancellation_or_uninstall_trouble` splits from billing because the reply is
+completely different. `feature_missing` splits from `shopify_platform_limit`
+because merchants constantly confuse a missing feature with a Shopify constraint
+and support must not. `support_only` was added later, for the reason below.
+
+### Corrections made to AI-written code
+
+**The JSON schema was invalid and all 12 trial calls failed.** A field cannot
+declare `enum` alongside a nullable type union like `["string", "null"]`. The two
+cases have to be written as separate branches under `anyOf`.
+
+What matters more than the bug is what happened around it. The run did not crash.
+All 12 failures were recorded in a `classification_failures` table with the error
+text, the script exited cleanly, and clearing that table made them retry. The
+requirement that a malformed response must not kill a long run was tested by
+accident on the first attempt, and held.
+
+**A category gap that would have skewed the most important number.** In the trial,
+the review "Worst customer support ever" came back with no complaint category and,
+worse, no resolvability. Because support quality had deliberately been moved out of
+the category list, reviews where support is the *entire* complaint had nowhere to
+go, and a missing resolvability drops them out of the fix, explain or escalate
+split. That split is the number the whole project is for.
+
+The fix was a `support_only` category for reviews that name no underlying technical
+or billing problem, plus an explicit rule that resolvability can never be empty
+when a complaint exists. Responding faster is within support's control, so those
+reviews belong in "support can fix".
+
+This is why the trial ran on 12 reviews before spending money on 1,559.
+
+### Results
+
+1,559 reviews classified, no failures.
+
+Who could resolve the 133 reviews that contain a complaint:
+
+| | Count |
+|---|---|
+| Support could fix it | 52 |
+| Support can only explain it | 47 |
+| Needs engineering | 34 |
+
+Complaint types, most common first: feature_missing 32, billing_surprise 21,
+app_unreliable 18, theme_or_styling_conflict 15, support_only 14, other 9,
+third_party_integration_broken 7, unexpected_order_change 6,
+cancellation_or_uninstall_trouble 5, shopify_platform_limit 4, offer_not_firing 1,
+no_measurable_return 1.
+
+44 reviews mention a support failure alongside whatever else they came for.
+
+What the praise is about: support quality 971, general approval 210, revenue
+results 136, ease of setup 108, custom work done for them 65. Support quality is
+mentioned in more than half of all reviews in the dataset.
+
+### The finding that justifies classifying everything
+
+Only 77 of the 133 complaints come from reviews rated 3 stars or below. **The other
+56, more than four in ten, are in 4 and 5 star reviews.** Thirty-eight are in
+5-star reviews: merchants who are happy overall and still describe a problem.
+
+Had this project classified only the negatives, as originally planned, it would
+have missed 42% of the complaints in its own dataset, and every one of those is a
+ticket someone had to answer.
+
+### The hand-audit has not been run yet
+
+`audit.py` exists and is the reason any of these numbers should be believed. It
+draws a sample spread across every complaint type, shows each review without the
+model's answer, records a human judgement, and then reports the agreement rate and
+prints every disagreement in full. The random seed is fixed so anyone re-running
+gets the same sample.
+
+At the time of writing it has not been run. Until it has, every figure in this
+section is the model's opinion, unchecked. That is stated here rather than left for
+someone to discover.
+
+### Known limitations of this stage
+
+The model was given the star rating alongside the text, which may pull its
+sentiment judgement toward the rating rather than the words.
+
+Staff names come back as the model read them, including case and spelling
+variants. "Dom" and "DOM" appear separately, and "Lilllian" is almost certainly
+"Lillian". Any leaderboard needs to normalise these, and near-matches should be
+merged with care rather than automatically.
+
+75 reviews were classified with low confidence, mostly very short ones. They are
+kept, and the confidence field is stored so they can be excluded from any figure
+where they would mislead.
+
+---
+
+## Stage 4: checking complaints against the documentation
+
+Date: 26 August 2026
+
+### What this stage does
+
+Downloads the index of Aftersell's public docs from
+`https://docs.aftersell.com/llms.txt`, which lists 265 pages with a title and
+description each and covers both apps. For every complaint type it decides whether
+the docs already cover the problem.
+
+### The definition of "buried" had to change
+
+The plan was to treat pages buried deep in the documentation tree as hard to find.
+Measuring the index killed that idea: 228 of the 265 pages sit at the same depth.
+The tree is flat, so depth carries no information at all.
+
+The replacement rule is better anyway, because the real question was never how deep
+a page sits. It is whether the merchant would find it.
+
+So each complaint type is judged with the merchants' own quotes placed next to the
+doc index, and the test is: if a merchant typed the words in these reviews into a
+search box, would these page titles come back?
+
+- documented and easy to find: a page covers it in words merchants actually use
+- documented but buried: a page covers it in internal or product vocabulary
+- not documented: nothing covers it
+
+This makes the finding actionable. When the answer is "buried", the fix is renaming
+or cross-linking a page rather than writing one, so the tool also returns a
+suggested title in the merchant's words.
+
+### Results
+
+| Tag | Complaint types | Reviews affected |
+|---|---|---|
+| Documented but buried | 4 | 58 |
+| Documented and easy to find | 6 | 55 |
+| Not documented | 2 | 20 |
+
+The largest single complaint type, `feature_missing` with 32 reviews, is tagged
+buried. So is `app_unreliable` with 18.
+
+Two things are genuinely not documented anywhere. **How to contact support** has no
+page at all: nothing explains how to reach a human, what response times to expect,
+how to escalate, or what coverage looks like during peak season. Fourteen reviews
+complain purely about support, and several of those specifically describe not
+knowing how to reach anyone. **Unexpected order changes** also has no page, despite
+six reviews describing products appearing on customer orders without consent.
+
+### Known limitations of this stage
+
+The judgement is made from titles and descriptions only, not from reading the 265
+pages. A page whose description undersells its contents will be judged too harshly.
+This was a deliberate trade: the description is also all a merchant sees in a search
+result, so it is the right thing to judge findability on, but it is the wrong thing
+to judge the writing on. This stage measures findability, not quality.
+
+The tags are one model's judgement and have not been checked by hand the way the
+review classifications will be.
