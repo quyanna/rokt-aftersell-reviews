@@ -1,0 +1,11 @@
+# Scraped pages and derived data - regenerate with `uv run fetch.py`
+data/
+
+# Secrets. The Anthropic API key lives in the environment, never in the repo.
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
