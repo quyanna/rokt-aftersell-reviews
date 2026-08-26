@@ -28,17 +28,17 @@ dependencies. There is nothing else to set up. No virtual environment, no
 `pip install`.
 
 ```bash
-uv run fetch.py
+uv run fetch.py && uv run parse.py
 ```
 
-That is stage 1. Later stages get added as they are built.
+That is stages 1 and 2. Later stages get added as they are built.
 
 ## The five stages
 
 | Stage | Script | What it does | Status |
 |---|---|---|---|
 | 1 | `fetch.py` | Downloads every review page and saves the raw HTML | Done |
-| 2 | `parse.py` | Pulls the reviews out of the HTML into a SQLite database | Not started |
+| 2 | `parse.py` | Pulls the reviews out of the HTML into a SQLite database | Done |
 | 3 | `classify.py` | Has Claude categorise each review, then hand-checks its work | Not started |
 | 4 | `docs_match.py` | Checks each complaint against Aftersell's own help docs | Not started |
 | 5 | `report.py` | Builds the triage sheet as a single HTML page | Not started |
@@ -81,13 +81,39 @@ I checked before writing any code.
 The whole job is about 180 requests at one per second, run once. Re-runs make no
 requests at all.
 
+## Stage 2: what is in the database
+
+`data/reviews.db` holds 1,765 reviews dated February 2020 to August 2026, one row
+each, with the rating, date, full text, store name, country, how long the merchant had
+used the app, and Rokt's reply where there is one. It is a plain SQLite file, so you
+can query it directly.
+
+| App | 1 star | 2 | 3 | 4 | 5 | Total |
+|---|---|---|---|---|---|---|
+| `aftersell` | 21 | 10 | 2 | 23 | 849 | 905 |
+| `upcart-cart-builder` | 38 | 4 | 8 | 16 | 794 | 860 |
+
+803 reviews (45%) got a reply from Rokt. 83 are negative, meaning 3 stars or fewer.
+
+Two things about the data are worth knowing before trusting any number built on it.
+For the 106 reviews marked as edited, the date shown is the date of the edit, and the
+original date is not published anywhere. And 439 reviews, a quarter of the total, were
+written by merchants who had used the app for less than a day, 97 of them within an
+hour of installing.
+
+`parse.py` checks its own output every time it runs, before printing anything. If the
+site markup changes and the parser starts reading the wrong element, the build stops
+rather than quietly producing a database that looks fine.
+
 ## Working with AI on this project
 
 Claude is used two different ways here, and the distinction matters.
 
 It wrote most of the code. I read every line before running it, and where the
-generated code was wrong I fixed it. Those fixes are logged in [NOTES.md](NOTES.md),
-including three bugs in the first draft of `fetch.py`.
+generated code was wrong I fixed it. Those fixes are logged in [NOTES.md](NOTES.md).
+The stage 2 entry is the one worth reading: a bug filled the country column with store
+names in all 1,765 rows, and the printed summary looked entirely correct anyway. It
+turned up only because I wrote a check for it.
 
 It also classifies the reviews in stage 3, and that is the part where taking the
 output on trust would be a real mistake. So stage 3 includes a hand-audit: I label a
@@ -100,8 +126,9 @@ labels are wrong.
 
 ```
 fetch.py      stage 1, the downloader
+parse.py      stage 2, HTML into SQLite, with built-in data checks
 NOTES.md      decision log: every judgement call and why
-data/         scraped pages and derived data, not committed, regenerate with fetch.py
+data/         scraped pages and the database, not committed, regenerate with the scripts
 ```
 
 ## No secrets in this repo
