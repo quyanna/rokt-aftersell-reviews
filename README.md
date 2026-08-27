@@ -1,5 +1,7 @@
 # Shopify review → support triage sheet
 
+**Read it here: [quyanna.github.io/rokt-aftersell-reviews](https://quyanna.github.io/rokt-aftersell-reviews/)**
+
 Reads the public Shopify App Store reviews for Aftersell (post-purchase upsells) and
 UpCart (cart drawer), then works out what a support person would actually have to do
 about each recurring complaint.
@@ -31,9 +33,10 @@ dependencies. There is nothing else to set up. No virtual environment, no
 ./run.sh
 ```
 
-That runs all seven steps and writes two linked pages: `triage-sheet.html`, which makes
-the argument, and `data.html`, which shows all 122 complaints in full so the argument can
-be checked. Every stage is incremental, so re-running costs nothing and repeats no work.
+That runs all seven steps and writes two linked pages into `docs/`: `index.html`, which
+makes the argument, and `data.html`, which shows all 122 complaints in full so the
+argument can be checked. Pushing `docs/` publishes them, since GitHub Pages serves that
+folder. Every stage is incremental, so re-running costs nothing and repeats no work.
 
 Stage 3 needs an Anthropic API key. Put it in a `.env` file as
 `ANTHROPIC_API_KEY=...` or export it in your shell. Classifying all 1,559 reviews
@@ -210,8 +213,9 @@ classify.py   stage 3, asks Claude to categorise every review
 sample.py     stage 3b, writes a readable sample of the answers to check by hand
 verify.py     stage 3c, proves every quote and name comes from its source review
 docs_match.py stage 4, ticket types against the published doc index
-report.py     stage 5, builds triage-sheet.html
-data_page.py  stage 5b, builds data.html, the searchable companion
+report.py     stage 5, builds docs/index.html, the triage sheet
+data_page.py  stage 5b, builds docs/data.html, the searchable companion
+docs/         the published site, committed and served by GitHub Pages
 tickets.py    the written analysis and draft replies, the hand-written half
 ticket_types.sql  the rule that turns classifier fields into ticket types
 run.sh        runs the whole pipeline
