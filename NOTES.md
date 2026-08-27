@@ -330,13 +330,13 @@ This is why the trial ran on 12 reviews before spending money on 1,559.
 
 1,559 reviews classified, no failures.
 
-Who could resolve the 133 reviews that contain a complaint:
+Who could resolve the 124 reviews that contain a complaint:
 
 | | Count |
 |---|---|
-| Support could fix it | 52 |
-| Support can only explain it | 47 |
-| Needs engineering | 34 |
+| Support could fix it | 45 |
+| Support can only explain it | 44 |
+| Needs engineering | 35 |
 
 Complaint types, most common first: feature_missing 32, billing_surprise 21,
 app_unreliable 18, theme_or_styling_conflict 15, support_only 14, other 9,
@@ -372,10 +372,75 @@ At the time of writing it has not been run. Until it has, every figure in this
 section is the model's opinion, unchecked. That is stated here rather than left for
 someone to discover.
 
+### What the model was and was not told
+
+This is worth stating plainly, because the resolvability field looks more
+authoritative than it is.
+
+The classifier was given four things: the app name, the star rating, how long the
+merchant had used the app, and the review text. That is all. It did not read
+Aftersell's documentation, it did not see Rokt's public reply to the review, and it
+has no access to Rokt's ticket system or to any record of what their support team
+is actually authorised to do.
+
+So "support could fix this" means: a careful reader, given the three definitions
+written into the prompt, concluded from the review text that this is the kind of
+problem support resolves. It does not mean Rokt support can, in fact, resolve it.
+Whether an agent can issue a refund or write custom CSS for a merchant is a fact
+about Rokt's internal policy that appears nowhere in this dataset.
+
+Requiring the model to justify itself was added after a first pass that stored only
+labels. With nothing but a label recorded, there was no way for anyone to check a
+judgement, which made the most important number in the project unauditable. Every
+row that carries a resolvability now carries one sentence explaining it, and the
+hand-audit shows that sentence whenever a human disagrees.
+
+Adding that requirement changed the answers. Nine reviews previously judged to
+contain a complaint were reclassified as containing none, and the split moved from
+52/47/34 to 45/44/35. A judgement that shifts when you ask for reasoning was not a
+firm judgement to begin with, which is the honest way to read that.
+
+### Rokt's public replies were considered as evidence and deliberately rejected
+
+Seventy-five of the complaints have a reply from Rokt posted publicly underneath
+the review. That looked like useful grounding, since it is Rokt describing what
+they actually did, so it was examined before being ruled out.
+
+It should not go into the classifier. Twenty-nine of the seventy-five open with a
+stock thank-you phrase and describe nothing. One thanks the wrong person: the
+merchant writes that Jeswin helped them, and the reply credits Lillian.
+
+The real problem is the framing. These replies are written for prospective
+merchants reading the review page, not for the person who complained, and they
+reframe accordingly. Four of them use phrasings like "I believe there may be a
+misunderstanding here" and "this is actually normal behaviour for all apps on the
+Shopify App store". Every one of those pushes a complaint toward "support can only
+explain it".
+
+Feeding them to the classifier would teach it to adopt Rokt's public account of
+Rokt's own failures, biasing the single most important field in the direction most
+flattering to the company this analysis is about. The replies are still useful, but
+to a person: a human auditor can read "there may be a misunderstanding" and discount
+the spin.
+
+The documentation was rejected as classifier input for a different reason. A help
+page existing tells you a problem is documented, not that support can resolve it.
+"Why isn't my post-purchase offer displaying?" is a real page, but the cause behind
+it might be a Shopify platform limit that nobody can fix. Feeding the index in
+would push the model to reason from "a page exists" to "support can walk them
+through it", which is wrong for exactly the cases that matter most.
+
 ### Known limitations of this stage
 
 The model was given the star rating alongside the text, which may pull its
 sentiment judgement toward the rating rather than the words.
+
+Vague anger defaults to escalation. Five of the thirty-five "needs engineering"
+calls are low confidence, and every one of those five is a review under ten words
+with no diagnostic content at all: "stupid app, buggy", "Endless issues. There are
+much better cart apps". The model has nothing to work with and reaches for
+engineering. Any headline figure for the escalation rate should be shown both with
+and without the low-confidence rows.
 
 Staff names come back as the model read them, including case and spelling
 variants. "Dom" and "DOM" appear separately, and "Lilllian" is almost certainly

@@ -127,7 +127,8 @@ def report(db):
     rows = db.execute(
         """
         SELECT a.review_id, a.my_complaint, a.my_resolvability, a.note,
-               c.complaint_type, c.resolvability, c.confidence, r.rating, r.body
+               c.complaint_type, c.resolvability, c.confidence, r.rating, r.body,
+               c.resolvability_reason
         FROM audit a
         JOIN classifications c USING(review_id)
         JOIN reviews r USING(review_id)
@@ -141,7 +142,7 @@ def report(db):
     complaint_agree = resolvability_agree = resolvability_total = 0
     disagreements = []
 
-    for rid, mine_c, mine_r, note, model_c, model_r, conf, rating, body in rows:
+    for rid, mine_c, mine_r, note, model_c, model_r, conf, rating, body, why in rows:
         model_c = model_c or "no_complaint"
         if mine_c == model_c:
             complaint_agree += 1
@@ -150,7 +151,9 @@ def report(db):
             if mine_r == model_r:
                 resolvability_agree += 1
         if mine_c != model_c or (mine_r and mine_r != model_r):
-            disagreements.append((rid, mine_c, model_c, mine_r, model_r, conf, rating, body, note))
+            disagreements.append(
+                (rid, mine_c, model_c, mine_r, model_r, conf, rating, body, note, why)
+            )
 
     n = len(rows)
     print(f"\n{n} reviews labelled by hand and compared.\n")
@@ -165,7 +168,7 @@ def report(db):
         return
 
     print(f"\n{len(disagreements)} disagreements, listed in full:\n")
-    for rid, mine_c, model_c, mine_r, model_r, conf, rating, body, note in disagreements:
+    for rid, mine_c, model_c, mine_r, model_r, conf, rating, body, note, why in disagreements:
         print("-" * 76)
         print(f"review {rid}, {rating} stars, model confidence {conf}")
         print(textwrap.fill(" ".join(body.split()), 74)[:400])
@@ -173,6 +176,9 @@ def report(db):
             print(f"  complaint:     you said {mine_c}, model said {model_c}")
         if mine_r and mine_r != model_r:
             print(f"  resolvability: you said {mine_r}, model said {model_r}")
+            if why:
+                print(textwrap.fill(f"  the model's reason: {why}", 74,
+                                    subsequent_indent="    "))
         if note:
             print(f"  your note: {note}")
 

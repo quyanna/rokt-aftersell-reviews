@@ -145,6 +145,13 @@ with no complaint, say what they valued.
 confidence: "high", "medium" or "low". Use low when the review is too short or \
 vague to classify with any confidence, which is common.
 
+resolvability_reason: one sentence saying WHY you chose that resolvability, \
+pointing at what in the review drove the decision. Name the specific thing, for \
+example "Shopify does not support post-purchase offers on Apple Pay, so there is \
+nothing to fix" or "the merchant wants a refund, which an agent can issue". Null \
+only when resolvability is null. This sentence is what a person will read when \
+checking your work, so make it checkable rather than restating the label.
+
 resolvability must NOT be null whenever complaint_type is not null. Every complaint \
 has someone who owns it. A complaint purely about support quality is \
 "support_can_fix", because responding faster and more helpfully is within support's \
@@ -174,6 +181,7 @@ SCHEMA = {
         "resolvability": nullable_enum(
             ["support_can_fix", "explain_only", "needs_engineering"]
         ),
+        "resolvability_reason": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "praise_type": nullable_enum(PRAISE_TYPES),
         "staff_mentioned": {"type": "array", "items": {"type": "string"}},
         "wanted": {"type": "string"},
@@ -181,7 +189,8 @@ SCHEMA = {
     },
     "required": [
         "sentiment", "complaint_type", "secondary_complaint", "support_failure",
-        "resolvability", "praise_type", "staff_mentioned", "wanted", "confidence",
+        "resolvability", "resolvability_reason", "praise_type", "staff_mentioned",
+        "wanted", "confidence",
     ],
     "additionalProperties": False,
 }
@@ -194,6 +203,7 @@ CREATE TABLE IF NOT EXISTS classifications (
     secondary_complaint TEXT,
     support_failure     INTEGER,
     resolvability       TEXT,
+    resolvability_reason TEXT,  -- why the model chose that, so a person can check it
     praise_type         TEXT,
     staff_mentioned     TEXT,   -- JSON array
     wanted              TEXT,
@@ -262,6 +272,21 @@ def main():
     db = sqlite3.connect(DB_PATH, check_same_thread=False)
     db.executescript(TABLE)
 
+    # Add any column the table predates, so an existing database keeps working.
+    existing = {c[1] for c in db.execute("PRAGMA table_info(classifications)")}
+    for column in ["resolvability_reason"]:
+        if column not in existing:
+            db.execute(f"ALTER TABLE classifications ADD COLUMN {column} TEXT")
+            db.commit()
+            print(f"added column {column} to the existing database")
+
+    if "--redo-complaints" in sys.argv:
+        gone = db.execute(
+            "DELETE FROM classifications WHERE resolvability IS NOT NULL"
+        ).rowcount
+        db.commit()
+        print(f"cleared {gone} rows that carry a resolvability, so they get redone")
+
     # Reviews with no text have nothing to classify, so they are skipped entirely
     # rather than sent to the model to produce a meaningless answer.
     todo = db.execute(
@@ -302,22 +327,25 @@ def main():
             return
 
         with lock:
+            row = {
+                "review_id": review_id,
+                "sentiment": parsed.get("sentiment"),
+                "complaint_type": parsed.get("complaint_type"),
+                "secondary_complaint": parsed.get("secondary_complaint"),
+                "support_failure": int(bool(parsed.get("support_failure"))),
+                "resolvability": parsed.get("resolvability"),
+                "resolvability_reason": parsed.get("resolvability_reason"),
+                "praise_type": parsed.get("praise_type"),
+                "staff_mentioned": json.dumps(parsed.get("staff_mentioned") or []),
+                "wanted": parsed.get("wanted"),
+                "confidence": parsed.get("confidence"),
+                "model": MODEL,
+                "raw_response": raw,
+            }
             db.execute(
-                "INSERT OR REPLACE INTO classifications VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    review_id,
-                    parsed.get("sentiment"),
-                    parsed.get("complaint_type"),
-                    parsed.get("secondary_complaint"),
-                    int(bool(parsed.get("support_failure"))),
-                    parsed.get("resolvability"),
-                    parsed.get("praise_type"),
-                    json.dumps(parsed.get("staff_mentioned") or []),
-                    parsed.get("wanted"),
-                    parsed.get("confidence"),
-                    MODEL,
-                    raw,
-                ),
+                f"INSERT OR REPLACE INTO classifications ({','.join(row)})"
+                f" VALUES ({','.join(':' + c for c in row)})",
+                row,
             )
             db.commit()
             done["n"] += 1
@@ -359,6 +387,14 @@ def summarise(db):
         " WHERE complaint_type IS NOT NULL GROUP BY 1 ORDER BY 2 DESC"
     ):
         print(f"  {label:<36}{count:>6}")
+
+    missing = ask(
+        "SELECT COUNT(*) FROM classifications"
+        " WHERE resolvability IS NOT NULL AND resolvability_reason IS NULL"
+    )[0][0]
+    if missing:
+        print(f"\n  {missing} rows have a resolvability with no reason recorded."
+              f" Re-run with --redo-complaints.")
 
     flagged = ask("SELECT COUNT(*) FROM classifications WHERE support_failure = 1")[0][0]
     print(f"\n{flagged} reviews mention a support failure")

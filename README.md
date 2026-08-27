@@ -110,23 +110,35 @@ rather than quietly producing a database that looks fine.
 
 ## Stage 3: what the reviews are about
 
-133 reviews contain a complaint. Who could resolve them:
+124 reviews contain a complaint. Who could resolve them:
 
 | | Count |
 |---|---|
-| Support could fix it | 52 |
-| Support can only explain it | 47 |
-| Needs engineering | 34 |
+| Support could fix it | 45 |
+| Support can only explain it | 44 |
+| Needs engineering | 35 |
+
+Every one of those rows records a sentence explaining why it was judged that way,
+so the reasoning can be checked rather than taken on trust. What that judgement
+does not know is covered below.
 
 The most common complaints are a genuinely missing feature (32), a billing surprise
 (21), the app crashing or freezing (18), and a theme conflict (15). A further 44
 reviews complain about support quality alongside whatever else brought them there.
 
-Only 77 of those 133 complaints come from reviews rated 3 stars or below. The other
-56 are in 4 and 5 star reviews, 38 of them in 5-star reviews from merchants who are
-happy overall and still describe a problem. Classifying only the negatives, which
-was the original plan, would have missed four in ten of the complaints in this
-dataset.
+Fewer than two thirds of those complaints come from reviews rated 3 stars or below.
+The rest are in 4 and 5 star reviews, from merchants who are happy overall and still
+describe a problem. Classifying only the negatives, which was the original plan,
+would have missed roughly four in ten of the complaints in this dataset.
+
+**What the classifier was told, and what it was not.** It saw the app name, the star
+rating, the merchant's tenure, and the review text. It did not read Aftersell's
+documentation, did not see Rokt's public reply to the review, and has no knowledge
+of what Rokt's support team is actually authorised to do. So "support could fix it"
+means a careful reader concluded that from the review text. Whether an agent can in
+fact issue that refund is a matter of Rokt's internal policy, which appears nowhere
+in this dataset. [NOTES.md](NOTES.md) covers why Rokt's public replies were examined
+as grounding and deliberately rejected.
 
 Praise is overwhelmingly about people rather than software. Support quality is the
 reason given in 971 reviews, against 136 for revenue results.
