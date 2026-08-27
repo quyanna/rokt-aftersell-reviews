@@ -26,7 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 DB_PATH = HERE / "data" / "reviews.db"
 CSS_PATH = HERE / "assets" / "brief.css"
-OUT_PATH = HERE / "data.html"
+OUT_PATH = HERE / "docs" / "data.html"
 
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -127,7 +127,7 @@ def main():
     <span class="chip"><b>{total:,}</b> reviews collected</span>
     <span class="chip"><b>{classified:,}</b> classified</span>
     <span class="chip"><b>{complaints}</b> contain a complaint</span>
-    <span class="chip"><a href="triage-sheet.html">Back to the triage sheet</a></span>
+    <span class="chip"><a href="index.html">Back to the triage sheet</a></span>
   </div>
 </header>""")
 
@@ -349,7 +349,7 @@ sqlite&gt; SELECT ticket_type, COUNT(*) FROM ticket_types GROUP BY 1 ORDER BY 2 
 
     out.append(f"""
 <footer>
-  <p><a href="triage-sheet.html">Back to the triage sheet</a> &middot;
+  <p><a href="index.html">Back to the triage sheet</a> &middot;
   <a href="https://github.com/quyanna/rokt-aftersell-reviews">Source and method on GitHub</a></p>
   <p>Review text belongs to the merchants who wrote it and is public on the Shopify App
   Store. Collected 26 August 2026.</p>
@@ -357,6 +357,7 @@ sqlite&gt; SELECT ticket_type, COUNT(*) FROM ticket_types GROUP BY 1 ORDER BY 2 
 </div>
 {SCRIPT}""")
 
+    OUT_PATH.parent.mkdir(exist_ok=True)
     OUT_PATH.write_text("\n".join(out), encoding="utf-8")
     print(f"Wrote {OUT_PATH} ({OUT_PATH.stat().st_size / 1024:.0f}KB)")
     print(f"  {complaints} complaints listed, {len(listed)} names, {len(brandon)} Brandons")

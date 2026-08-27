@@ -30,7 +30,7 @@ from tickets import TICKETS
 HERE = Path(__file__).parent
 DB_PATH = HERE / "data" / "reviews.db"
 CSS_PATH = HERE / "assets" / "brief.css"
-OUT_PATH = HERE / "triage-sheet.html"
+OUT_PATH = HERE / "docs" / "index.html"
 SHOTS_DIR = HERE / "screenshots"
 
 FONTS = (
@@ -700,6 +700,7 @@ def main():
 </footer>
 </div>""")
 
+    OUT_PATH.parent.mkdir(exist_ok=True)
     OUT_PATH.write_text("\n".join(out), encoding="utf-8")
     size = OUT_PATH.stat().st_size
     print(f"Wrote {OUT_PATH} ({size / 1024:.0f}KB)")

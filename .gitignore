@@ -1,4 +1,5 @@
 # Scraped pages and derived data - regenerate with `uv run fetch.py`
+# docs/ is the published site and IS committed.
 data/
 
 # Secrets. The Anthropic API key lives in the environment, never in the repo.

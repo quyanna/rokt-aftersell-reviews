@@ -16,5 +16,5 @@ echo "== 6/7  building the triage sheet =="    && uv run report.py
 echo "== 7/7  building the data page =="       && uv run data_page.py
 
 echo
-echo "Done. Open triage-sheet.html (data.html sits alongside it)"
+echo "Done. Open docs/index.html (data.html sits alongside it)"
 echo "To check the classifications by hand: uv run sample.py"
