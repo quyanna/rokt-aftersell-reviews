@@ -44,6 +44,8 @@ FONTS = (
 
 # Colour carries meaning in this stylesheet, so the mapping is fixed here rather
 # than chosen per use. Teal is a strength, amber is a gap, magenta is the subject.
+APP_NAME = {"aftersell": "Aftersell", "upcart-cart-builder": "UpCart"}
+
 RESOLVE_LABEL = {
     "support_can_fix": ("Support resolves it", "t-strong"),
     "explain_only": ("Support explains it", "t-mid"),
@@ -252,9 +254,14 @@ def main():
         doc = docs.get(name)
         res = ask("""SELECT resolvability, COUNT(*) FROM ticket_types WHERE ticket_type=?
                      GROUP BY 1 ORDER BY 2 DESC""", name)
-        quote = ask("""SELECT evidence_quote FROM ticket_types WHERE ticket_type=?
-                       AND evidence_quote IS NOT NULL ORDER BY LENGTH(evidence_quote) DESC
-                       LIMIT 1""", name)
+        # Two real reviews per type, attributed. Longest evidence quotes first,
+        # since those are the ones that show what the merchant actually described.
+        examples = ask("""
+            SELECT c.evidence_quote, r.app, r.review_date, r.rating, r.is_edited
+            FROM ticket_types t JOIN classifications c USING(review_id)
+            JOIN reviews r USING(review_id)
+            WHERE t.ticket_type = ? AND c.evidence_quote IS NOT NULL
+            ORDER BY LENGTH(c.evidence_quote) DESC LIMIT 2""", name)
 
         tags = " ".join(
             f'<span class="tag {RESOLVE_LABEL[r][1]}">{RESOLVE_LABEL[r][0]} &middot; {n}</span>'
@@ -277,6 +284,21 @@ def main():
         {f'<p class="aside"><b>Would be found more often as:</b> {e(suggested)}</p>' if suggested else ''}
       </div>"""
 
+        examples_html = ""
+        if examples:
+            items = "".join(
+                f'<li>&ldquo;{e(q)}&rdquo;<br>'
+                f'<span class="mono" style="font-size:11px;color:var(--ink3)">'
+                f'{APP_NAME[app]} &middot; {stars_}&#9733; &middot; {date}'
+                f'{" &middot; edited, so this is the edit date" if edited else ""}'
+                f'</span></li>'
+                for q, app, date, stars_, edited in examples
+            )
+            examples_html = (
+                '<p class="aside"><b>Quoted from the reviews:</b></p>'
+                f'<ul class="plain">{items}</ul>'
+            )
+
         out.append(f"""
 <section>
   <div class="sec-head"><span class="sec-num">{num()}</span><h2>{e(t['title'])}</h2></div>
@@ -288,13 +310,15 @@ def main():
 
     <h4>What the merchant says</h4>
     <p class="say">{e(t['says'])}</p>
+    <p class="aside">Phrasings drawn from across the {count} reviews in this category,
+    not a single quote. Real quotes with their source are below.</p>
 
     <h4>What is actually going on</h4>
     {paragraphs(t['going_on'])}
 
     <h4>Who resolves it</h4>
     <p>{tags}</p>
-    {f'<p class="aside"><b>Typical evidence in the review:</b> &ldquo;{e(quote[0][0])}&rdquo;</p>' if quote else ''}
+    {examples_html}
 
     <h4>Is it already documented</h4>
     {doc_block or '<p class="aside">Not assessed.</p>'}

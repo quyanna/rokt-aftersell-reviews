@@ -111,7 +111,8 @@ def main():
 
         row = db.execute(
             """
-            SELECT r.app, r.rating, r.tenure_bucket, r.body,
+            SELECT r.app, r.rating, r.tenure_bucket, r.body, r.review_date, r.is_edited,
+                   r.store_name, r.country,
                    c.complaint_type, c.secondary_complaint, c.support_failure,
                    c.resolvability, c.resolvability_reason, c.evidence_quote,
                    c.praise_type, c.staff_mentioned, c.wanted, c.confidence
@@ -121,12 +122,17 @@ def main():
             (review_id,),
         ).fetchone()
 
-        (app, rating, tenure, body, complaint, secondary, support_failure,
+        (app, rating, tenure, body, review_date, is_edited, store, country,
+         complaint, secondary, support_failure,
          resolvability, reason, quote, praise, staff, wanted, confidence) = row
+        app_name = {"aftersell": "Aftersell", "upcart-cart-builder": "UpCart"}.get(app, app)
+        dated = f"{review_date} (edited, so this is the edit date)" if is_edited else review_date
 
         lines += [
-            f"### {n}.  {'*' * rating}{'.' * (5 - rating)}  "
-            f"{app}, {tenure or 'tenure not stated'}",
+            f"### {n}.  {'*' * rating}{'.' * (5 - rating)}  {app_name}",
+            "",
+            f"*{store}, {country}  |  {dated}  |  "
+            f"{tenure or 'tenure not stated'}*",
             "",
             "> " + wrap(body).replace("\n", "\n> "),
             "",
