@@ -430,6 +430,40 @@ it might be a Shopify platform limit that nobody can fix. Feeding the index in
 would push the model to reason from "a page exists" to "support can walk them
 through it", which is wrong for exactly the cases that matter most.
 
+### Where the line between complaint and no complaint sits
+
+This came up while preparing the hand-audit, from a review that reads:
+
+> My theme didn't have a nice cart drawer so I downloaded UPcart app and it made my
+> cart drawer 10X better. Also had some issues but customer service was on it and
+> fixed it within 10 minutes
+
+That merchant contacted support. A ticket existed. So is it a complaint?
+
+Checking how the classifier handled this class settled it. Of 166 five-star reviews
+that mention an issue, a problem or a fix, 162 were labelled as containing no
+complaint and 4 were not. The four exceptions are exactly the ones where the
+merchant said what actually broke: "doesn't work at the beginning due to a theme
+issue", "the cart not displaying the add to cart button correctly". The 162 say
+things like "had an issue, sent an email and they had it fixed within 10 min".
+
+So the rule is whether the problem is NAMED, not whether it was resolved and not
+whether the review is angry. A resolved problem inside a glowing review still counts
+if the merchant says what it was, because that is a ticket type you can act on. An
+unnamed problem does not, because there is nothing to categorise.
+
+The classifier arrived at that line on its own and applied it consistently, but the
+prompt never stated it. That is a flaw worth recording: a rule the model infers is
+one a human auditor cannot know, and disagreements would then measure the vague
+prompt rather than the model's reliability. The rule is now written into the prompt,
+and `audit.py` prints it above every review so both judgements use the same test.
+
+The rule has a real cost, and it belongs beside the sampling caveat. Reviews that
+mention an unnamed resolved problem represent genuine support contacts that this
+analysis does not count. **This project measures identifiable ticket types, not
+ticket volume**, and the gap between those two is larger than the numbers here
+suggest.
+
 ### Known limitations of this stage
 
 The model was given the star rating alongside the text, which may pull its

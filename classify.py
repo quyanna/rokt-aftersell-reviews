@@ -80,7 +80,15 @@ sentiment: "negative", "mixed" or "positive". Judge the text, not the star ratin
 they sometimes disagree.
 
 complaint_type: the merchant's PRIMARY problem, or null if the review contains no \
-complaint. Choose exactly one:
+complaint.
+
+A review names a complaint only when it says WHAT went wrong. "Install didn't work \
+because of a theme issue" names it. "Had some issues but support fixed it fast" \
+does not, and is null, even though it plainly generated a support ticket. A problem \
+that was resolved is still a complaint if the merchant says what it was, including \
+inside an otherwise glowing five-star review.
+
+Choose exactly one:
 - billing_surprise: charged unexpectedly, usage fees not understood, price rose \
   without warning, charged after uninstalling, asking for a refund.
 - cancellation_or_uninstall_trouble: cannot find how to cancel or turn something \

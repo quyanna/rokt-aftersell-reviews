@@ -41,6 +41,22 @@ CREATE TABLE IF NOT EXISTS audit (
 
 RESOLVABILITY = ["support_can_fix", "explain_only", "needs_engineering"]
 
+# The rule the classifier follows, written down so you apply the same one. If you
+# judge by a different rule, the agreement rate measures the difference between
+# the rules rather than how reliable the model is.
+RULES = """  NAMED problem  -> pick a complaint type, even in a glowing 5-star review.
+                    "doesn't work due to a theme issue" names what broke.
+  UNNAMED problem -> no_complaint, even though it clearly generated a ticket.
+                    "had some issues but support fixed it" names nothing, so
+                    there is no ticket type to record.
+
+  Resolvability, if there is a complaint:
+    support_can_fix   an agent with admin access, willing to change settings or
+                      write CSS, resolves it in the ticket. Refunds included.
+    explain_only      nothing is broken. A Shopify rule, the pricing model
+                      working as designed, or a feature that does not exist.
+    needs_engineering a real defect. Support can only reproduce and escalate."""
+
 
 def draw_sample(db, size):
     """Pick a stratified random sample, spread across what the model found."""
@@ -103,6 +119,9 @@ def label_next(db, complaint_types):
     print(f"{left} left to label.  {app}, {rating} stars, {tenure or 'tenure not stated'}")
     print("=" * 76)
     print(textwrap.fill(" ".join(body.split()), 74))
+    print("\n" + "-" * 76)
+    print(RULES)
+    print("-" * 76)
 
     complaint = ask("Primary complaint?", complaint_types + ["no_complaint"])
     if complaint is None:
