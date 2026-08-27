@@ -16,8 +16,10 @@ Usage:
     uv run report.py
 """
 
+import base64
 import html
 import json
+import mimetypes
 import sqlite3
 import sys
 from collections import Counter
@@ -29,6 +31,7 @@ HERE = Path(__file__).parent
 DB_PATH = HERE / "data" / "reviews.db"
 CSS_PATH = HERE / "assets" / "brief.css"
 OUT_PATH = HERE / "triage-sheet.html"
+SHOTS_DIR = HERE / "screenshots"
 
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -65,6 +68,15 @@ def e(text):
     text = text.replace(" \u2013 ", ", ").replace("\u2013", "-")
     text = text.replace(" , ", ", ").replace(", ,", ",")
     return html.escape(text)
+
+
+def embed(filename):
+    """Inline an image as a data URI so the report stays a single file."""
+    path = SHOTS_DIR / filename
+    if not path.exists():
+        return None
+    kind = mimetypes.guess_type(path.name)[0] or "image/png"
+    return f"data:{kind};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 
 def paragraphs(text):
@@ -131,6 +143,9 @@ def main():
     audit = ask("SELECT reviewed_by, reviewed_on, sample_size, disagreements FROM audit_record")
     audit = audit[0] if audit else None
 
+    step = iter(range(1, 99))
+    num = lambda: f"{next(step):02d}"
+
     out = [f"<title>Aftersell and UpCart support triage</title>{FONTS}",
            f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
            '<div class="wrap">']
@@ -157,7 +172,7 @@ def main():
     pct_no_text = no_text / total_reviews
     out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">01</span><h2>Read this first</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>Read this first</h2></div>
   <div class="sec-body">
     <p class="lede">This measures loud complaints, not common ones. Treating it as a
     picture of the real queue would be wrong in a specific and predictable direction.</p>
@@ -198,9 +213,9 @@ def main():
 </section>""")
 
     # --------------------------------------------------------- 02 ticket types
-    out.append("""
+    out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">02</span><h2>The recurring ticket types</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>The recurring ticket types</h2></div>
   <div class="sec-body">
     <p class="lede">Ranked by how often they appear. The star average beside each one is
     the more useful number: it says how angry the merchant is when this type arrives.</p>""")
@@ -226,7 +241,7 @@ def main():
 </section>""")
 
     # each ticket type in full
-    for i, (name, count, stars) in enumerate(ticket_rows, 1):
+    for name, count, stars in ticket_rows:
         if name not in TICKETS:
             continue
         t = TICKETS[name]
@@ -260,7 +275,7 @@ def main():
 
         out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">{i:02d}</span><h2>{e(t['title'])}</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>{e(t['title'])}</h2></div>
   <div class="sec-body">
     <div class="mast-meta" style="margin:0 0 22px">
       <span class="chip"><b>{count}</b> reviews</span>
@@ -289,10 +304,9 @@ def main():
 </section>""")
 
     # ------------------------------------------------ findings: the split
-    n = len(ticket_rows)
     out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">{n + 1:02d}</span><h2>What the split says about the job</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>What the split says about the job</h2></div>
   <div class="sec-body">
     <p class="lede">Of {complaints} complaints, {decided} could be assigned an owner from
     the review text and {resolve.get('cannot_tell', 0)} could not.</p>
@@ -344,7 +358,7 @@ def main():
 
     out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">{n + 2:02d}</span><h2>When complaints arrive</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>When complaints arrive</h2></div>
   <div class="sec-body">
     <p class="lede">The brief expected a cluster in week one, which would point at
     onboarding. The data says the opposite.</p>
@@ -395,7 +409,7 @@ def main():
 
     out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">{n + 3:02d}</span><h2>Aftersell against UpCart</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>Aftersell against UpCart</h2></div>
   <div class="sec-body">
     <p class="lede">UpCart's one-star rate is roughly double Aftersell's. The reason is
     not more of the same complaints. It is different complaints.</p>
@@ -441,7 +455,7 @@ def main():
 
     out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">{n + 4:02d}</span><h2>What the praise is about</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>What the praise is about</h2></div>
   <div class="sec-body">
     <p class="lede">Support quality is the reason given in {praise.get('support_quality', 0)}
     reviews. Revenue results, which is what the product is sold on, account for
@@ -485,6 +499,74 @@ def main():
   </div>
 </section>""")
 
+    # ------------------------------------------ checking the doc findings
+    tests = ask("""SELECT ticket_type, question, answer, verdict, note, screenshot
+                   FROM doc_verification ORDER BY id""")
+    if tests:
+        confirmed = sum(1 for t in tests if t[3] == "confirmed")
+        refined = sum(1 for t in tests if t[3] == "refined")
+        out.append(f"""
+<section>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>Checking the documentation findings against the vendor</h2></div>
+  <div class="sec-body">
+    <p class="lede">Aftersell publishes a documentation assistant that searches the
+    actual page content. The findings above were judged from page titles and
+    descriptions only, so the assistant was asked the same questions a merchant would.</p>
+
+    <p>Four tests. {confirmed} confirmed a finding. {refined} corrected one. The
+    corrections are shown because they are the more useful half.</p>""")
+
+        for ticket, question, answer, verdict, note, shot in tests:
+            card = "good" if verdict == "confirmed" else "warn"
+            label = "Confirmed" if verdict == "confirmed" else "Corrected the finding"
+            uri = embed(shot) if shot else None
+            fig = ""
+            if uri:
+                fig = f"""
+      <figure>
+        <div class="svg-card"><img src="{uri}" alt="Aftersell documentation assistant answering: {e(question)}" style="max-width:100%;height:auto;display:block;margin:0 auto"></div>
+        <figcaption>Aftersell's own documentation assistant, asked &ldquo;{e(question)}&rdquo;
+        on 26 August 2026.</figcaption>
+      </figure>"""
+            out.append(f"""
+    <h3>{e(question)}</h3>
+    <p class="aside"><b>Relates to:</b> {e(TICKETS.get(ticket, {}).get("title", ticket.replace("_", " ")))}</p>
+    <div class="say">{e(answer)}</div>
+    {fig}
+    <div class="card {card}">
+      <p class="card-label">{label}</p>
+      <p>{e(note)}</p>
+    </div>""")
+
+        out.append("""
+    <div class="card key">
+      <p class="card-label">The pattern worth taking away</p>
+      <p><b>The documentation covers prevention and not remediation.</b> There is a page
+      explaining how to stop customers claiming a reward twice. There is nothing
+      explaining what to do about the order that already has one. Every merchant who
+      writes in has the second problem, not the first.</p>
+      <p>The same shape appears elsewhere. Pricing is documented, disputed charges are
+      not. Theme compatibility is documented, a store already broken by a conflict is
+      not. A support queue is made almost entirely of people whose problem has already
+      happened.</p>
+    </div>
+
+    <div class="card">
+      <p class="card-label">A note on the reward page</p>
+      <p>The mitigation for double-claimed rewards is real and documented, and it is
+      opt-in. Until a merchant finds a page titled "Preventing reward exploits" and
+      follows it, the default configuration allows a customer to add a reward product
+      from its own product page and claim it twice. That is a setup default worth
+      raising at onboarding rather than leaving for the merchant to discover after
+      losing money on it.</p>
+    </div>
+
+    <p class="aside">The assistant is a semantic search over the docs, so it may find a
+    page a merchant using site search or Google would miss. That makes it strong evidence
+    when it fails to find something and weaker evidence when it succeeds.</p>
+  </div>
+</section>""")
+
     # ------------------------------------------------ how it was built
     audit_line = ""
     if audit:
@@ -511,7 +593,7 @@ def main():
 
     out.append(f"""
 <section>
-  <div class="sec-head"><span class="sec-num">{n + 5:02d}</span><h2>How this was built, and how it was checked</h2></div>
+  <div class="sec-head"><span class="sec-num">{num()}</span><h2>How this was built, and how it was checked</h2></div>
   <div class="sec-body">
     <p class="lede">Claude read and categorised the reviews. That is only worth something
     if the output was checked, so here is what was checked and what was not.</p>
