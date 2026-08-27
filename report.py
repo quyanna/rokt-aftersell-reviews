@@ -478,7 +478,8 @@ def main():
     for (blob,) in ask("SELECT staff_mentioned FROM classifications"):
         for nm in json.loads(blob or "[]"):
             names[nm.strip().title()] += 1
-    top_names = names.most_common(10)
+    # Everyone named 15 times or more. A round top-10 would have cut through a tie.
+    top_names = [(nm, c) for nm, c in names.most_common() if c >= 15]
     top_peak = top_names[0][1]
 
     out.append(f"""
@@ -506,13 +507,18 @@ def main():
     product. It is the thing merchants write about.</p>
 
     <h3>Named most often</h3>
-    <p class="aside">{len(names)} individuals are named across the dataset. Every name below
-    was checked against the review that contains it.</p>""")
+    <p class="aside">{len(names)} individuals are named across the dataset; the
+    {len(top_names)} below are named fifteen times or more. Every name was checked against
+    the review that contains it, and <a href="data.html">the full list</a> is on the data
+    page.</p>""")
 
     for nm, c in top_names:
+        # One name in this list goes somewhere. Nothing points it out.
+        shown = (f'<a href="data.html#brandon">{e(nm)}</a>'
+                 if nm.lower() == "brandon" else e(nm))
         out.append(f"""
     <div class="bar-row">
-      <div class="bar-name">{e(nm)}</div>
+      <div class="bar-name">{shown}</div>
       <div class="bar-track"><div class="bar-fill s" style="width:{c / top_peak * 100:.0f}%"></div></div>
       <div class="bar-val">{c}</div>
     </div>""")

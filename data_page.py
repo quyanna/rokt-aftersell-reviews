@@ -232,7 +232,7 @@ sqlite&gt; SELECT ticket_type, COUNT(*) FROM ticket_types GROUP BY 1 ORDER BY 2 
         best = max(brandon, key=lambda b: 0 if len(b[5]) > 60 else 1)
         countries = len({b[3] for b in brandon})
         out.append(f"""
-<section>
+<section id="brandon">
   <div class="sec-head"><span class="sec-num">03</span><h2>A note on Brandon</h2></div>
   <div class="sec-body">
     <p class="lede">While counting which support staff merchants name most often, one
