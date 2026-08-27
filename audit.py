@@ -15,6 +15,7 @@ Usage:
     uv run audit.py            # label the next unlabelled review in the sample
     uv run audit.py --size 50  # draw a fresh sample of this many (default 50)
     uv run audit.py --report   # compare your labels against the model's
+    uv run audit.py --reset    # discard all labels and start over
 
 The sample is stratified: every complaint type the model found is represented,
 so the audit cannot accidentally consist of fifty easy five-star reviews.
@@ -243,6 +244,17 @@ def main():
 
     if not db.execute("SELECT COUNT(*) FROM classifications").fetchone()[0]:
         sys.exit("Nothing classified yet. Run `uv run classify.py` first.")
+
+    if "--reset" in sys.argv:
+        # Labels made under an earlier version of the rules measure the rules,
+        # not the model. Clearing them is the honest move after a rule change.
+        gone = db.execute("SELECT COUNT(*) FROM audit WHERE my_complaint IS NOT NULL").fetchone()[0]
+        db.execute("DROP TABLE audit")
+        db.executescript(TABLE)
+        db.commit()
+        print(f"Cleared {gone} hand labels and the old sample. A fresh sample will")
+        print("be drawn on the next run, under the current rules.")
+        return
 
     if "--report" in sys.argv:
         report(db)

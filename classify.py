@@ -47,7 +47,8 @@ COMPLAINT_TYPES = [
     "theme_or_styling_conflict",
     "third_party_integration_broken",
     "shopify_platform_limit",
-    "feature_missing",
+    "capability_gap",
+    "feature_request",
     "unexpected_order_change",
     "no_measurable_return",
     "support_only",
@@ -102,17 +103,20 @@ Choose exactly one:
 - shopify_platform_limit: Shopify itself forbids what the merchant wants. The \
   clearest case is post-purchase upsells not working with Apple Pay, Shop Pay or \
   Google Pay. Use this ONLY for genuine Shopify platform constraints.
-- feature_missing: the app genuinely lacks a capability, such as translations, \
-  multi-currency or A/B testing. This is the app's roadmap, NOT a Shopify limit. \
-  Merchants confuse the two; you should not.
+- capability_gap: a missing capability that COST the merchant something. They \
+  downgraded, uninstalled, could not launch, or lost money over it. The absence \
+  blocked them.
+- feature_request: a missing capability the merchant merely wants. They are still \
+  using the app and are broadly satisfied. "I wish it also did X." This is a real \
+  queue item but it is not a problem, and it must not be counted alongside a \
+  merchant who was wrongly charged. Split these two by consequence, not by how \
+  politely it is phrased.
 - unexpected_order_change: products added to a customer's order without consent, \
   duplicate charges, chargebacks caused by the app.
 - no_measurable_return: the app works but the merchant sees no revenue from it.
-- support_only: support quality IS the whole complaint. Use this when the merchant \
-  is unhappy about slow, absent or unhelpful support and names no underlying \
-  technical or billing problem. If they do name one, use that category instead and \
-  record the support problem in support_failure.
-- other: a real complaint that fits nothing above.
+- other: a real complaint that fits nothing above. If support quality is the whole \
+  complaint and no underlying technical or billing problem is named, use "other" \
+  and set support_failure true; the flag already identifies those reviews.
 
 secondary_complaint: a second complaint_type value if the review clearly raises \
 another distinct problem, otherwise null. Never repeat complaint_type.
@@ -153,6 +157,13 @@ with no complaint, say what they valued.
 confidence: "high", "medium" or "low". Use low when the review is too short or \
 vague to classify with any confidence, which is common.
 
+evidence_quote: the EXACT words from the review that justify your resolvability \
+choice, copied character for character with nothing added, changed or paraphrased. \
+It must be a literal substring of the review text, because it is checked \
+automatically against the review and a quote that does not match is treated as an \
+error. Keep it under 25 words. Null ONLY when resolvability is null or \
+"cannot_tell". If you cannot produce this quote, your resolvability is cannot_tell.
+
 resolvability_reason: one sentence saying WHY you chose that resolvability, \
 pointing at what in the review drove the decision. Name the specific thing, for \
 example "Shopify does not support post-purchase offers on Apple Pay, so there is \
@@ -160,15 +171,13 @@ nothing to fix" or "the merchant wants a refund, which an agent can issue". Null
 only when resolvability is null. This sentence is what a person will read when \
 checking your work, so make it checkable rather than restating the label.
 
-resolvability must NOT be null whenever complaint_type is not null. Every complaint \
-has someone who owns it. A complaint purely about support quality is \
-"support_can_fix", because responding faster and more helpfully is within support's \
-control.
+resolvability must NOT be null whenever complaint_type is not null, but \
+"cannot_tell" is a full and proper answer, so there is never a reason to guess.
 
-Be strict about resolvability. When a merchant is angry about something that is \
-genuinely Shopify's constraint or genuinely the documented pricing model, that is \
-"explain_only" even though they are furious. When an app repeatedly breaks, that \
-is "needs_engineering" even if support was polite about it."""
+When the review DOES give you enough: a merchant angry about something that is \
+genuinely Shopify's constraint or the documented pricing model is "explain_only" \
+even though they are furious, and an app that repeatedly breaks is \
+"needs_engineering" even if support was polite about it."""
 
 def nullable_enum(values):
     """A field that is either one of `values` or null.
@@ -187,8 +196,9 @@ SCHEMA = {
         "secondary_complaint": nullable_enum(COMPLAINT_TYPES),
         "support_failure": {"type": "boolean"},
         "resolvability": nullable_enum(
-            ["support_can_fix", "explain_only", "needs_engineering"]
+            ["support_can_fix", "explain_only", "needs_engineering", "cannot_tell"]
         ),
+        "evidence_quote": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "resolvability_reason": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "praise_type": nullable_enum(PRAISE_TYPES),
         "staff_mentioned": {"type": "array", "items": {"type": "string"}},
@@ -197,8 +207,8 @@ SCHEMA = {
     },
     "required": [
         "sentiment", "complaint_type", "secondary_complaint", "support_failure",
-        "resolvability", "resolvability_reason", "praise_type", "staff_mentioned",
-        "wanted", "confidence",
+        "resolvability", "resolvability_reason", "evidence_quote", "praise_type",
+        "staff_mentioned", "wanted", "confidence",
     ],
     "additionalProperties": False,
 }
@@ -212,6 +222,7 @@ CREATE TABLE IF NOT EXISTS classifications (
     support_failure     INTEGER,
     resolvability       TEXT,
     resolvability_reason TEXT,  -- why the model chose that, so a person can check it
+    evidence_quote      TEXT,   -- literal span of the review, checked automatically
     praise_type         TEXT,
     staff_mentioned     TEXT,   -- JSON array
     wanted              TEXT,
@@ -282,7 +293,7 @@ def main():
 
     # Add any column the table predates, so an existing database keeps working.
     existing = {c[1] for c in db.execute("PRAGMA table_info(classifications)")}
-    for column in ["resolvability_reason"]:
+    for column in ["resolvability_reason", "evidence_quote"]:
         if column not in existing:
             db.execute(f"ALTER TABLE classifications ADD COLUMN {column} TEXT")
             db.commit()
@@ -343,6 +354,7 @@ def main():
                 "support_failure": int(bool(parsed.get("support_failure"))),
                 "resolvability": parsed.get("resolvability"),
                 "resolvability_reason": parsed.get("resolvability_reason"),
+                "evidence_quote": parsed.get("evidence_quote"),
                 "praise_type": parsed.get("praise_type"),
                 "staff_mentioned": json.dumps(parsed.get("staff_mentioned") or []),
                 "wanted": parsed.get("wanted"),

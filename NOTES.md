@@ -586,3 +586,93 @@ to judge the writing on. This stage measures findability, not quality.
 
 The tags are one model's judgement and have not been checked by hand the way the
 review classifications will be.
+
+---
+
+## Stage 3c: making the classification defensible
+
+Date: 26 August 2026
+
+The classification had to survive being questioned by someone who knows the product
+better than the analysis does. Four changes were made, in order of how much they
+matter.
+
+### Every decided judgement quotes the review it came from
+
+The classifier must now copy the exact words from the review that justify its
+resolvability choice, character for character. That quote is stored beside the
+label.
+
+This turns an opinion into something checkable. "Support could fix this" on its own
+invites the question "how do you know". "Support could fix this, because the
+merchant wrote *Varun helped me solved the problem instantly*" answers it before it
+is asked.
+
+### The quote is verified automatically, so nothing can be invented
+
+`verify.py` checks every stored quote against the review it claims to come from,
+and every extracted staff name against the review that names them. A quote that is
+not a literal span of its source fails the check and the script exits with an error.
+
+Current result across all 1,559 classified reviews:
+
+| Check | Result |
+|---|---|
+| Staff names present in their review | 609 of 609 |
+| Evidence quotes are literal spans | 109 of 109 |
+| Rows with a resolvability that have a reason | all |
+| Decided rows carrying a quote | all |
+
+This proves something narrow and worth having. It does not prove the judgements are
+correct, and the script says so when it passes. It proves nothing was fabricated,
+which is the accusation that would be hardest to recover from.
+
+The check has teeth. It failed twice during development: once on a row where the
+model chose "needs engineering" and produced no quote, and once on a batch before
+the quote rule existed. Both were fixed by re-running those rows, not by relaxing
+the check.
+
+### The model can now say it does not know
+
+Resolvability gained a fourth value, "cannot_tell", and the rule for reaching it is
+mechanical rather than a matter of nerve: if you cannot quote words from the review
+that establish which of the three applies, the answer is cannot_tell. Confidence in
+a reading does not count. General knowledge of how Shopify apps behave does not
+count. Only the merchant's own words.
+
+The effect is visible. "Brilliant app when it works! Which it never did." was
+previously "needs engineering", which is a guess about whether the app is defective
+or misconfigured. It is now cannot_tell. Thirteen complaints now carry it.
+
+Thirteen is lower than the fifty-nine estimated earlier from category structure, and
+that gap is not resolved. The model may still be deciding cases it should decline.
+The hand-audit is what will settle it, because a person using the same quote test
+can be compared directly against the model.
+
+### Two categories the model would not apply are now decided by a written rule
+
+The model consistently refused to use the "support_only" category, filing those
+reviews under "other" instead. Reading them showed why: the category name reads as
+"nothing but support", and reviews that mention a chatbot or name an agent do not
+feel like they qualify. Fourteen support complaints ended up in a bucket that says
+nothing.
+
+Rather than keep rewriting the prompt until the model complied, the ticket types are
+now derived from the model's fields by an explicit rule, kept in `ticket_types.sql`
+as a database view. A named fault wins over the support experience around it, so a
+merchant whose billing broke and who also waited three days is a billing ticket.
+Where no fault is named and support_failure is set, the ticket type is
+support_experience.
+
+That is more defensible than the label it replaces. A rule can be read, disagreed
+with, and re-run to the same answer. It reduced the unclassified pile from fourteen
+to three.
+
+### What this still does not fix
+
+Resolvability remains ungrounded in anything about Rokt. The quote proves the
+merchant said the thing. It does not prove a Rokt agent is permitted to issue that
+refund. That fact is not in the reviews, not in the docs, and not on the App Store
+listing, so the report presents resolvability as a routing recommendation per ticket
+type rather than as a measured proportion, and the cases the analysis cannot settle
+are written up as questions rather than findings.
