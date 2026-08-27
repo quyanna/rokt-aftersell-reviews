@@ -42,7 +42,8 @@ costs a few dollars of API credit, paid once and then cached.
 | 1 | `fetch.py` | Downloads every review page and saves the raw HTML | Done |
 | 2 | `parse.py` | Pulls the reviews out of the HTML into a SQLite database | Done |
 | 3 | `classify.py` | Has Claude categorise each review | Done |
-| 3b | `audit.py` | Checks a sample of those answers by hand | Built, not yet run |
+| 3b | `sample.py` | Draws a readable sample of the answers to check by hand | Done, 41 reviewed |
+| 3c | `verify.py` | Checks every quote and name against its source review | Passing |
 | 4 | `docs_match.py` | Checks each complaint against Aftersell's own help docs | Done |
 | 5 | `report.py` | Builds the triage sheet as a single HTML page | Not started |
 
@@ -175,9 +176,25 @@ the output on trust would be a real mistake. So `audit.py` shows me a sample spr
 across every complaint type, one review at a time, without the model's answer,
 records what I think, and then reports the agreement rate and every disagreement.
 
-That audit has not been run yet, which means every stage 3 number above is currently
-the model's opinion, unchecked. Saying so is the point. The agreement rate goes into
-`NOTES.md` and the final report once it exists.
+Two checks back that up, one mechanical and one human.
+
+`verify.py` string-matches every extracted staff name and every evidence quote
+against the review it came from. A fabricated quote fails and the script exits with
+an error. It currently passes on 609 of 609 names and 109 of 109 quotes. That proves
+nothing was invented. It does not prove the judgements are right, and the script
+says so when it passes.
+
+`sample.py` draws a stratified random sample and writes it to a numbered document
+showing each review, the model's decision, its reasoning, and the exact words it says
+justify that decision. 41 reviews were read this way on 26 August 2026, with one
+disagreement. That disagreement changed the report: it showed the `needs_engineering`
+label implied support does nothing, when support in fact takes first contact on every
+ticket, so the label is now worded "support triages, engineering fixes". See
+[NOTES.md](NOTES.md) and [resolvability_labels.md](resolvability_labels.md).
+
+The limit of that audit is stated rather than glossed. The person reading the sample
+had the same review text the model had and no access to Rokt's internal policies.
+Two readers agreeing is consistency, not correctness.
 
 ## Files
 
@@ -185,7 +202,9 @@ the model's opinion, unchecked. Saying so is the point. The agreement rate goes 
 fetch.py      stage 1, the downloader
 parse.py      stage 2, HTML into SQLite, with built-in data checks
 classify.py   stage 3, asks Claude to categorise every review
-audit.py      stage 3b, checks a sample of those answers by hand
+sample.py     stage 3b, writes a readable sample of the answers to check by hand
+verify.py     stage 3c, proves every quote and name comes from its source review
+ticket_types.sql  the rule that turns classifier fields into ticket types
 docs_match.py stage 4, complaint types against the published doc index
 NOTES.md      decision log: every judgement call and why
 data/         scraped pages and the database, not committed, regenerate with the scripts

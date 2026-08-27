@@ -676,3 +676,68 @@ refund. That fact is not in the reviews, not in the docs, and not on the App Sto
 listing, so the report presents resolvability as a routing recommendation per ticket
 type rather than as a measured proportion, and the cases the analysis cannot settle
 are written up as questions rather than findings.
+
+---
+
+## Stage 3d: the hand-audit, and what it changed
+
+Date: 26 August 2026
+Reviewed by: Quyanna Campbell
+
+### How it was done
+
+The first attempt at this was an interactive script that asked a question per review
+and required them to be answered in order. It was abandoned as unusable for checking
+forty things.
+
+What replaced it is a document. `sample.py` draws a stratified random sample, three
+from every ticket type plus six the model found no complaint in, and writes it to
+`data/audit-sample.md` with each entry numbered. Every entry shows the review, the
+model's decision, the model's reasoning, and the exact words from the review the
+model says justify it. It is read top to bottom, at whatever pace, and the only
+response needed is the number of anything that looks wrong. The seed is fixed, so
+anyone can regenerate the identical sample.
+
+### Result
+
+41 reviews read. **One disagreement.**
+
+The disagreement was with "Discount codes wont work, sort of like their non existent
+customer support. I watched their support chatbox for 3 hours with ZERO replies",
+which the model labelled `needs_engineering`. The auditor's position: support could
+reproduce and explain the issue, escalating only if that proved necessary.
+
+### What that one disagreement changed
+
+It was right about far more than the one review.
+
+The label `needs_engineering` implies support does nothing, and that is wrong for
+every one of the 31 rows carrying it. Support takes first contact on every ticket in
+this dataset. A merchant reporting broken discount codes reaches support, and support
+reproduces it, explains what is happening, and escalates if it turns out to be a
+defect. Calling that "needs engineering" makes the figure read as a hand-off rate
+when it is really a "support cannot close this alone" rate.
+
+So the label is reworded in the report to "support triages, engineering fixes". The
+stored value is unchanged, so the model's own reasoning and the audit trail stay
+intact. `resolvability_labels.md` records the mapping and the reason for it.
+
+Checking the reasoning text confirmed the gap. Only 2 of the 31 reasons mention
+support reproducing or investigating at all, even though it applies to all of them.
+The model was reasoning about who fixes the fault and not about who handles the
+ticket, which is the distinction the audit caught.
+
+### What this audit does and does not establish
+
+It establishes that the labels are readable, that the evidence quotes support them,
+and that an informed outsider agreed with 40 of 41.
+
+It does not establish that the labels match how Rokt's support team actually works.
+The auditor said so directly: this is not their job, and they were reading the same
+review text the model read, with no more access to Rokt's internal policies than it
+had. Two readers agreeing is consistency, not correctness, and the one disagreement
+came from thinking about support as a workflow rather than from any outside knowledge.
+
+That is the honest weight to give it. It is a real check by a person, it caught a
+real defect that changed the report, and it cannot verify the thing that would need
+someone inside Rokt to verify.
