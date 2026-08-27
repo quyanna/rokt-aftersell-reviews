@@ -464,6 +464,45 @@ analysis does not count. **This project measures identifiable ticket types, not
 ticket volume**, and the gap between those two is larger than the numbers here
 suggest.
 
+### How much of the resolvability split is actually knowable
+
+The obvious objection to the hand-audit is that it does not fix anything. If a
+person outside Rokt does not know whether an agent can issue a refund, then them
+agreeing with the model measures whether two ungrounded readers reach the same
+guess. That is inter-rater agreement, not accuracy.
+
+The objection is largely right, so the size of the problem was measured rather than
+argued with. Sorting the 124 complaints by whether public evidence can settle them:
+
+| | Complaints | Why |
+|---|---|---|
+| Decidable from public evidence | 65 | see below |
+| Not decidable without Rokt's internal knowledge | 59 | see below |
+
+Three things this dataset does prove, which cover most of the decidable half. **65
+reviews describe support writing custom CSS and doing layout work for merchants**,
+so a theme conflict really is something support fixes. Merchants describe receiving
+refunds and credits, so billing goodwill is within their power. And the doc index
+settles whether a requested feature exists, which decides every `feature_missing`
+case. Shopify separately publishes which payment methods support post-purchase
+offers, which decides `shopify_platform_limit`.
+
+The undecidable half is dominated by two categories. **`billing_surprise`, 22
+reviews**, needs the merchant's actual invoice against their plan terms to say
+whether a charge was correct. **`app_unreliable`, 19 reviews**, cannot be separated
+into defect or misconfiguration without someone reproducing it. Both are guesses
+from the outside, however carefully worded.
+
+So `audit.py` offers "cannot tell from the review" as a fourth option and encourages
+using it. Those rows are excluded from the agreement rate rather than counted as
+disagreements, and the count of them is reported on its own, because the proportion
+of the split that rests on inference rather than knowledge is more useful than the
+agreement percentage. The audit screen also lists what the dataset does prove, so
+the decidable cases get decided on evidence instead of instinct.
+
+The model was not given a "cannot tell" option and answered every case. That is
+worth stating in the report next to the split.
+
 ### Known limitations of this stage
 
 The model was given the star rating alongside the text, which may pull its

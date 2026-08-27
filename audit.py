@@ -39,7 +39,12 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 """
 
-RESOLVABILITY = ["support_can_fix", "explain_only", "needs_engineering"]
+RESOLVABILITY = [
+    "support_can_fix",
+    "explain_only",
+    "needs_engineering",
+    "cannot_tell_from_the_review",
+]
 
 # The rule the classifier follows, written down so you apply the same one. If you
 # judge by a different rule, the agreement rate measures the difference between
@@ -55,7 +60,21 @@ RULES = """  NAMED problem  -> pick a complaint type, even in a glowing 5-star r
                       write CSS, resolves it in the ticket. Refunds included.
     explain_only      nothing is broken. A Shopify rule, the pricing model
                       working as designed, or a feature that does not exist.
-    needs_engineering a real defect. Support can only reproduce and escalate."""
+    needs_engineering a real defect. Support can only reproduce and escalate.
+    cannot_tell       the review does not contain enough to decide. USE THIS
+                      FREELY. It is a finding, not a failure to answer.
+
+  What this dataset does prove, so you are not guessing about it:
+    Support DOES write custom CSS and do layout work. 65 reviews describe it.
+    Support DOES issue refunds and credits. Merchants describe receiving them.
+    Aftersell's pricing and plan terms are public on the App Store listing.
+    The 265-page doc index shows whether a feature exists or genuinely does not.
+
+  What nothing here can tell you, so reach for cannot_tell:
+    Whether a described bug is a real defect or a misconfiguration. Telling
+    those apart needs someone to reproduce it.
+    Whether a specific charge was correct. That needs the merchant's invoice
+    against their plan, which is not public."""
 
 
 def draw_sample(db, size):
@@ -130,7 +149,10 @@ def label_next(db, complaint_types):
 
     resolvability = None
     if complaint != "no_complaint":
-        resolvability = ask("Who can resolve it?", RESOLVABILITY)
+        resolvability = ask(
+            "Who can resolve it?  (pick cannot_tell freely, it is a real answer)",
+            RESOLVABILITY,
+        )
 
     note = input("\n  Note (optional, press enter to skip): ").strip() or None
     db.execute(
@@ -159,13 +181,19 @@ def report(db):
         sys.exit("Nothing labelled yet. Run `uv run audit.py` first.")
 
     complaint_agree = resolvability_agree = resolvability_total = 0
+    undecidable = 0
     disagreements = []
 
     for rid, mine_c, mine_r, note, model_c, model_r, conf, rating, body, why in rows:
         model_c = model_c or "no_complaint"
         if mine_c == model_c:
             complaint_agree += 1
-        if mine_r:
+        if mine_r == "cannot_tell_from_the_review":
+            # Not a disagreement. It says the review cannot settle the question,
+            # which is the more useful thing to know about that row.
+            undecidable += 1
+            mine_r = None
+        elif mine_r:
             resolvability_total += 1
             if mine_r == model_r:
                 resolvability_agree += 1
@@ -181,6 +209,13 @@ def report(db):
     if resolvability_total:
         print(f"  Resolvability agrees on     {resolvability_agree}/{resolvability_total}"
               f"  ({resolvability_agree / resolvability_total:.0%})")
+    if undecidable:
+        judged = undecidable + resolvability_total
+        print(f"\n  You could not decide {undecidable} of {judged} resolvability calls"
+              f" ({undecidable / judged:.0%}) from the review alone.")
+        print("  The model answered all of them anyway. That gap is a finding:")
+        print("  it sizes how much of the fix/explain/escalate split is inference")
+        print("  rather than knowledge, and it belongs in the report.")
 
     if not disagreements:
         print("\nNo disagreements.")
