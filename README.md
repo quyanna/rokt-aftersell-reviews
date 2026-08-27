@@ -31,8 +31,9 @@ dependencies. There is nothing else to set up. No virtual environment, no
 ./run.sh
 ```
 
-That runs all six steps and writes `triage-sheet.html`. Every stage is incremental, so
-re-running it costs nothing and repeats no work.
+That runs all seven steps and writes two linked pages: `triage-sheet.html`, which makes
+the argument, and `data.html`, which shows all 122 complaints in full so the argument can
+be checked. Every stage is incremental, so re-running costs nothing and repeats no work.
 
 Stage 3 needs an Anthropic API key. Put it in a `.env` file as
 `ANTHROPIC_API_KEY=...` or export it in your shell. Classifying all 1,559 reviews
@@ -49,6 +50,7 @@ costs a few dollars of API credit, paid once and then cached.
 | 3c | `verify.py` | Checks every quote and name against its source review | Passing |
 | 4 | `docs_match.py` | Checks each complaint against Aftersell's own help docs | Done |
 | 5 | `report.py` | Builds the triage sheet as a single HTML page | Done |
+| 5b | `data_page.py` | Builds a companion page showing every complaint in full | Done |
 
 Each stage is a separate script on purpose. Pulling structured data out of a web page
 is finicky and the code that does it is always wrong on the first attempt. Keeping the
@@ -209,6 +211,7 @@ sample.py     stage 3b, writes a readable sample of the answers to check by hand
 verify.py     stage 3c, proves every quote and name comes from its source review
 docs_match.py stage 4, ticket types against the published doc index
 report.py     stage 5, builds triage-sheet.html
+data_page.py  stage 5b, builds data.html, the searchable companion
 tickets.py    the written analysis and draft replies, the hand-written half
 ticket_types.sql  the rule that turns classifier fields into ticket types
 run.sh        runs the whole pipeline

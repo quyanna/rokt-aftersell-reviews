@@ -7,13 +7,14 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-echo "== 1/6  fetching review pages =="        && uv run fetch.py
-echo "== 2/6  parsing into SQLite =="          && uv run parse.py
-echo "== 3/6  classifying reviews =="          && uv run classify.py
-echo "== 4/6  verifying every quote and name ==" && uv run verify.py
-echo "== 5/6  checking the documentation =="   && uv run docs_match.py
-echo "== 6/6  building the triage sheet =="    && uv run report.py
+echo "== 1/7  fetching review pages =="        && uv run fetch.py
+echo "== 2/7  parsing into SQLite =="          && uv run parse.py
+echo "== 3/7  classifying reviews =="          && uv run classify.py
+echo "== 4/7  verifying every quote and name ==" && uv run verify.py
+echo "== 5/7  checking the documentation =="   && uv run docs_match.py
+echo "== 6/7  building the triage sheet =="    && uv run report.py
+echo "== 7/7  building the data page =="       && uv run data_page.py
 
 echo
-echo "Done. Open triage-sheet.html"
+echo "Done. Open triage-sheet.html (data.html sits alongside it)"
 echo "To check the classifications by hand: uv run sample.py"

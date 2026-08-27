@@ -165,6 +165,7 @@ def main():
     <span class="chip"><b>{complaints}</b> contain a complaint</span>
     <span class="chip"><b>{len(ticket_rows)}</b> recurring types</span>
     <span class="chip">Built <b>26 Aug 2026</b></span>
+    <span class="chip"><a href="data.html">See the underlying data</a></span>
   </div>
 </header>""")
 
@@ -208,6 +209,9 @@ def main():
       <p>Not market research, and not an assessment of the product. It is a working
       answer to one question: if I were answering these tickets, what would keep arriving,
       what could I actually do about it, and what would stop it arriving at all.</p>
+      <p>Every claim here can be checked against the source.
+      <a href="data.html">The companion page</a> lists all {complaints} complaints in
+      full, with the review text and every field derived from it.</p>
     </div>
   </div>
 </section>""")
@@ -656,6 +660,8 @@ def main():
 
     out.append(f"""
 <footer>
+  <p><a href="data.html">The data behind this document</a>, with all {complaints}
+  complaints in full.</p>
   <p>Built from {total_reviews:,} public reviews of Aftersell and UpCart on the Shopify
   App Store, collected 26 August 2026. Source and method:
   <a href="https://github.com/quyanna/rokt-aftersell-reviews">github.com/quyanna/rokt-aftersell-reviews</a></p>
