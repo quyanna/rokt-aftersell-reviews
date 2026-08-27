@@ -146,13 +146,21 @@ def main():
         db.execute("DELETE FROM doc_coverage")
         db.commit()
 
+    # Drop coverage for any category the classifier no longer produces, so a
+    # renamed ticket type cannot keep an answer written for its old name.
+    db.execute(
+        "DELETE FROM doc_coverage WHERE complaint_type NOT IN"
+        " (SELECT DISTINCT ticket_type FROM ticket_types)"
+    )
+    db.commit()
+
     complaints = [
         row[0] for row in db.execute(
             """
-            SELECT complaint_type FROM classifications
-            WHERE complaint_type IS NOT NULL
-              AND complaint_type NOT IN (SELECT complaint_type FROM doc_coverage)
-            GROUP BY complaint_type ORDER BY COUNT(*) DESC
+            SELECT ticket_type FROM ticket_types
+            WHERE ticket_type NOT IN ('unclassified')
+              AND ticket_type NOT IN (SELECT complaint_type FROM doc_coverage)
+            GROUP BY ticket_type ORDER BY COUNT(*) DESC
             """
         )
     ]
@@ -168,8 +176,9 @@ def main():
         # about whether the doc titles match the vocabulary merchants use.
         quotes = db.execute(
             """
-            SELECT r.body, c.wanted FROM classifications c JOIN reviews r USING(review_id)
-            WHERE c.complaint_type = ? ORDER BY LENGTH(r.body) DESC LIMIT 8
+            SELECT r.body, c.wanted FROM ticket_types t
+            JOIN reviews r USING(review_id) JOIN classifications c USING(review_id)
+            WHERE t.ticket_type = ? ORDER BY LENGTH(r.body) DESC LIMIT 8
             """,
             (complaint,),
         ).fetchall()
@@ -216,13 +225,13 @@ def report(db):
         """
         SELECT d.complaint_type, d.tag, d.pages, d.reason, d.suggested_title
         FROM doc_coverage d
-        LEFT JOIN (SELECT complaint_type, COUNT(*) n FROM classifications GROUP BY 1) c
-          ON c.complaint_type = d.complaint_type
+        LEFT JOIN (SELECT ticket_type, COUNT(*) n FROM ticket_types GROUP BY 1) c
+          ON c.ticket_type = d.complaint_type
         ORDER BY c.n DESC
         """
     ):
         count = db.execute(
-            "SELECT COUNT(*) FROM classifications WHERE complaint_type = ?", (complaint,)
+            "SELECT COUNT(*) FROM ticket_types WHERE ticket_type = ?", (complaint,)
         ).fetchone()[0]
         print(f"{complaint}  ({count} reviews)")
         print(f"  {tag}")

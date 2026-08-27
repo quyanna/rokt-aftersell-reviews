@@ -28,8 +28,11 @@ dependencies. There is nothing else to set up. No virtual environment, no
 `pip install`.
 
 ```bash
-uv run fetch.py && uv run parse.py && uv run classify.py && uv run docs_match.py
+./run.sh
 ```
+
+That runs all six steps and writes `triage-sheet.html`. Every stage is incremental, so
+re-running it costs nothing and repeats no work.
 
 Stage 3 needs an Anthropic API key. Put it in a `.env` file as
 `ANTHROPIC_API_KEY=...` or export it in your shell. Classifying all 1,559 reviews
@@ -45,7 +48,7 @@ costs a few dollars of API credit, paid once and then cached.
 | 3b | `sample.py` | Draws a readable sample of the answers to check by hand | Done, 41 reviewed |
 | 3c | `verify.py` | Checks every quote and name against its source review | Passing |
 | 4 | `docs_match.py` | Checks each complaint against Aftersell's own help docs | Done |
-| 5 | `report.py` | Builds the triage sheet as a single HTML page | Not started |
+| 5 | `report.py` | Builds the triage sheet as a single HTML page | Done |
 
 Each stage is a separate script on purpose. Pulling structured data out of a web page
 is finicky and the code that does it is always wrong on the first attempt. Keeping the
@@ -204,7 +207,12 @@ parse.py      stage 2, HTML into SQLite, with built-in data checks
 classify.py   stage 3, asks Claude to categorise every review
 sample.py     stage 3b, writes a readable sample of the answers to check by hand
 verify.py     stage 3c, proves every quote and name comes from its source review
+docs_match.py stage 4, ticket types against the published doc index
+report.py     stage 5, builds triage-sheet.html
+tickets.py    the written analysis and draft replies, the hand-written half
 ticket_types.sql  the rule that turns classifier fields into ticket types
+run.sh        runs the whole pipeline
+assets/       the stylesheet the report is built against
 docs_match.py stage 4, complaint types against the published doc index
 NOTES.md      decision log: every judgement call and why
 data/         scraped pages and the database, not committed, regenerate with the scripts
